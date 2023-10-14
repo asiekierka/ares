@@ -8,6 +8,10 @@ struct Serial : Thread, IO {
   auto main() -> void;
   auto step(u32 clocks) -> void;
 
+  auto read(void) -> i32;
+  auto write(n8 byte) -> void;
+
+  // io.cpp
   auto readIO(n16 address) -> n8 override;
   auto writeIO(n16 address, n8 data) -> void override;
 
@@ -27,6 +31,10 @@ struct Serial : Thread, IO {
     struct Properties {
       Node::Debugger::Properties ports;
     } properties;
+
+    struct Tracer {
+      Node::Debugger::Tracer::Notification comms;
+    } tracer;
   } debugger{*this};
 
   struct State {

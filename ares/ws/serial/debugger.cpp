@@ -1,11 +1,14 @@
 auto Serial::Debugger::load(Node::Object parent) -> void {
   properties.ports = parent->append<Node::Debugger::Properties>("Serial I/O");
   properties.ports->setQuery([&] { return ports(); });
+  tracer.comms = parent->append<Node::Debugger::Tracer::Notification>("I/O", "Serial");
 }
 
 auto Serial::Debugger::unload(Node::Object parent) -> void {
   parent->remove(properties.ports);
+  parent->remove(tracer.comms);
   properties.ports.reset();
+  tracer.comms.reset();
 }
 
 auto Serial::Debugger::ports() -> string {

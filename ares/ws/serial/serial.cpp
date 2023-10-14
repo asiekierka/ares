@@ -4,6 +4,7 @@ namespace ares::WonderSwan {
 
 Serial serial;
 #include "debugger.cpp"
+#include "io.cpp"
 #include "serialization.cpp"
 
 auto Serial::load(Node::Object parent) -> void {
@@ -16,6 +17,16 @@ auto Serial::unload() -> void {
   node.reset();
 }
 
+auto Serial::read(void) -> i32 {
+  return -1;
+}
+
+auto Serial::write(n8 byte) -> void {
+  if(unlikely(debugger.tracer.comms->enabled())) {
+    debugger.tracer.comms->notify({"Write ", hex(byte, 2L)});
+  }
+}
+
 auto Serial::main() -> void {
   step(80);
   
@@ -23,13 +34,36 @@ auto Serial::main() -> void {
   if (!state.baudRate && ++state.baudClock < 4) return;
   state.baudClock = 0;
 
-  // stub implementation
+  // transfer
   if(state.txFull) {
-    if(++state.txBitClock == 9) {
+    if(++state.txBitClock == 10) {
+      write(state.dataTx);
       state.txBitClock = 0;
       state.txFull = 0;
     }
   }
+
+  // receive
+  if(++state.rxBitClock == 10) {
+    state.rxBitClock = 0;
+    auto value = read();
+    if(value >= 0) {
+      state.dataRx = value;
+      if(state.rxFull) {
+        // TODO: Is state.dataRx overwritten on overrun?
+        if(unlikely(debugger.tracer.comms->enabled())) {
+          debugger.tracer.comms->notify({"Read ", hex(value & 0xFF, 2L), " [overrun]"});
+        }
+        state.rxOverrun = 1;
+      } else {
+        if(unlikely(debugger.tracer.comms->enabled())) {
+          debugger.tracer.comms->notify({"Read ", hex(value & 0xFF, 2L)});
+        }
+        state.rxFull = 1;
+      }
+    }
+  }
+  
   cpu.irqLevel(CPU::Interrupt::SerialSend, !state.txFull);
   cpu.irqLevel(CPU::Interrupt::SerialReceive, state.rxFull);
 }
@@ -37,50 +71,6 @@ auto Serial::main() -> void {
 auto Serial::step(u32 clocks) -> void {
   Thread::step(clocks);
   Thread::synchronize(cpu);
-}
-
-auto Serial::readIO(n16 address) -> n8 {
-  n8 data;
-
-  switch(address) {
-
-  case 0x00b1:  //SER_DATA
-    data = state.dataRx;
-    state.rxFull = 0;
-    break;
-
-  case 0x00b3:  //SER_STATUS
-    data.bit(0) = state.rxFull;
-    data.bit(1) = state.rxOverrun;
-    data.bit(2) = !state.txFull;
-    data.bit(6) = state.baudRate;
-    data.bit(7) = state.enable;
-    break;
-
-  }
-
-  return data;
-}
-
-auto Serial::writeIO(n16 address, n8 data) -> void {
-  switch(address) {
-
-  case 0x00b1:  //SER_DATA
-    if(!state.txFull) {
-      state.dataTx = data;
-      state.txFull = 1;
-    }
-    break;
-
-  case 0x00b3:  //SER_STATUS
-    state.rxOverrun &= ~data.bit(5);
-    state.baudRate  = data.bit(6);
-    state.enable    = data.bit(7);
-    break;
-
-  }
-
-  return;
 }
 
 auto Serial::power() -> void {
