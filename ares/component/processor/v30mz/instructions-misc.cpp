@@ -42,9 +42,11 @@ auto V30MZ::instructionUndefined1() -> void {
   fetch<Byte>();
 }
 
+// TODO: At which exact cycle does the IN/OUT read/write happen?
 template<u32 size> auto V30MZ::instructionIn() -> void {
-  wait(6);
+  wait(5);
   setAccumulator<size>(in<size>(fetch<Byte>()));
+  wait(1);
 }
 
 template<u32 size> auto V30MZ::instructionOut() -> void {
@@ -53,8 +55,9 @@ template<u32 size> auto V30MZ::instructionOut() -> void {
 }
 
 template<u32 size> auto V30MZ::instructionInDW() -> void {
-  wait(5);
+  wait(4);
   setAccumulator<size>(in<size>(DW));
+  wait(1);
 }
 
 template<u32 size> auto V30MZ::instructionOutDW() -> void {
